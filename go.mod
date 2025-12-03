@@ -1,11 +1,10 @@
 module github.com/timescale/tsbs
 
-go 1.14
+go 1.23.0
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2
 	github.com/SiriDB/go-siridb-connector v0.0.0-20190110105621-86b34c44c921
-	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
 	github.com/aws/aws-sdk-go v1.44.20
 	github.com/blagojts/viper v1.6.3-0.20200313094124-068f44cf5e69
@@ -33,6 +32,45 @@ require (
 	golang.org/x/net v0.38.0
 	golang.org/x/time v0.5.0
 	gopkg.in/yaml.v2 v2.4.0
+)
+
+require (
+	github.com/StackExchange/wmi v1.2.1 // indirect
+	github.com/andybalholm/brotli v1.1.0 // indirect
+	github.com/cloudflare/golz4 v0.0.0-20150217214814-ef862a3cdc58 // indirect
+	github.com/fsnotify/fsnotify v1.5.4 // indirect
+	github.com/go-ole/go-ole v1.2.5 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
+	github.com/hashicorp/hcl v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
+	github.com/jackc/pgconn v1.14.3 // indirect
+	github.com/jackc/pgio v1.0.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgproto3/v2 v2.3.3 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/pgtype v1.14.0 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/klauspost/compress v1.17.7 // indirect
+	github.com/magiconair/properties v1.8.6 // indirect
+	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/pelletier/go-toml v1.9.5 // indirect
+	github.com/sergi/go-diff v1.2.0 // indirect
+	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/spf13/afero v1.9.2 // indirect
+	github.com/spf13/cast v1.5.0 // indirect
+	github.com/spf13/jwalterweatherman v1.1.0 // indirect
+	github.com/subosito/gotenv v1.4.1 // indirect
+	github.com/tklauser/go-sysconf v0.3.12 // indirect
+	github.com/tklauser/numcpus v0.6.1 // indirect
+	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	golang.org/x/crypto v0.37.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
+	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 )
 
 replace (

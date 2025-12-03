@@ -16,10 +16,12 @@ var (
 // Stat represents one statistical measurement, typically used to store the
 // latency of a query (or part of query).
 type Stat struct {
-	label     []byte
-	value     float64
-	isWarm    bool
-	isPartial bool
+	label      []byte
+	value      float64
+	isWarm     bool
+	isPartial  bool
+	byteLength uint64
+	hitKind    uint8
 }
 
 var statPool = &sync.Pool{
@@ -49,6 +51,16 @@ func (s *Stat) Init(label []byte, value float64) *Stat {
 	s.label = append(s.label, label...)
 	s.value = value
 	s.isWarm = false
+	return s
+}
+
+func (s *Stat) InitWithParam(label []byte, value float64, byteLength uint64, hitKind uint8) *Stat {
+	s.label = s.label[:0]
+	s.label = append(s.label, label...)
+	s.value = value
+	s.isWarm = false
+	s.byteLength = byteLength
+	s.hitKind = hitKind
 	return s
 }
 

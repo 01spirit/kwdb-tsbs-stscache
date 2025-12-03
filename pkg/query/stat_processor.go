@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/HdrHistogram/hdrhistogram-go"
 	"io/ioutil"
 	"log"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/HdrHistogram/hdrhistogram-go"
 )
 
 // statProcessor is used to collect, analyze, and print query execution statistics.
@@ -35,13 +36,19 @@ type statProcessorArgs struct {
 
 // statProcessor is used to collect, analyze, and print query execution statistics.
 type defaultStatProcessor struct {
-	args        *statProcessorArgs
-	wg          sync.WaitGroup
-	c           chan *Stat // c is the channel for Stats to be sent for processing
-	opsCount    uint64
-	startTime   time.Time
-	endTime     time.Time
-	statMapping map[string]*statGroup
+	args               *statProcessorArgs
+	wg                 sync.WaitGroup
+	c                  chan *Stat // c is the channel for Stats to be sent for processing
+	opsCount           uint64
+	startTime          time.Time
+	endTime            time.Time
+	statMapping        map[string]*statGroup
+	totalByteLength    uint64
+	prevByteLength     uint64
+	totalFullyGetNum   uint64
+	prevFullyGetNum    uint64
+	totalPartialGetNum uint64
+	prevPartialGetNum  uint64
 }
 
 func newStatProcessor(args *statProcessorArgs) statProcessor {
@@ -107,6 +114,13 @@ func (sp *defaultStatProcessor) process(workers uint) {
 			if err != nil {
 				log.Fatal(err)
 			}
+		} else {
+			atomic.AddUint64(&sp.totalByteLength, stat.byteLength)
+			if stat.hitKind == 2 {
+				atomic.AddUint64(&sp.totalFullyGetNum, 1)
+			} else if stat.hitKind == 1 {
+				atomic.AddUint64(&sp.totalPartialGetNum, 1)
+			}
 		}
 		if _, ok := sp.statMapping[string(stat.label)]; !ok {
 			sp.statMapping[string(stat.label)] = newStatGroup(*sp.args.limit)
@@ -141,14 +155,49 @@ func (sp *defaultStatProcessor) process(workers uint) {
 			now := time.Now()
 			sinceStart := now.Sub(sp.startTime)
 			took := now.Sub(prevTime)
+
+			intervalFullyGetNum := sp.totalFullyGetNum - sp.prevFullyGetNum
+			overallFullyGetNum := sp.totalFullyGetNum
+			intervalPartiallyGetNum := sp.totalPartialGetNum - sp.prevPartialGetNum
+			overallPartiallyGetNum := sp.totalPartialGetNum
+
+			intervalFullyGetRate := float64(intervalFullyGetNum) / float64(sp.opsCount-prevRequestCount)
+			overallFullyGetRate := float64(sp.totalFullyGetNum) / float64(i-sp.args.burnIn)
+			intervalPartiallyGetRate := float64(intervalPartiallyGetNum) / float64(sp.opsCount-prevRequestCount)
+			overallPartiallyGetRate := float64(sp.totalPartialGetNum) / float64(i-sp.args.burnIn)
+
 			intervalQueryRate := float64(sp.opsCount-prevRequestCount) / float64(took.Seconds())
 			overallQueryRate := float64(sp.opsCount) / float64(sinceStart.Seconds())
-			_, err := fmt.Fprintf(os.Stderr, "After %d queries with %d workers:\nInterval query rate: %0.2f queries/sec\tOverall query rate: %0.2f queries/sec\n",
+
+			_, err := fmt.Fprintf(os.Stderr, "After %d queries with %d workers:\n\tInterval query rate: %0.4f queries/sec\tOverall query rate: %0.4f queries/sec\n",
 				i-sp.args.burnIn,
 				workers,
 				intervalQueryRate,
 				overallQueryRate,
 			)
+			_, err = fmt.Fprintf(os.Stderr, "\tInterval fully get number: %d \t\t\t Overall fully get number: %d\n",
+				intervalFullyGetNum,
+				overallFullyGetNum,
+			)
+			_, err = fmt.Fprintf(os.Stderr, "\tInterval fully get rate: %0.4f \t\t Overall fully get rate: %0.4f \n",
+				intervalFullyGetRate,
+				overallFullyGetRate,
+			)
+			_, err = fmt.Fprintf(os.Stderr, "\tInterval partially get number: %d \t\t Overall partially get number: %d\n",
+				intervalPartiallyGetNum,
+				overallPartiallyGetNum,
+			)
+			_, err = fmt.Fprintf(os.Stderr, "\tInterval partially get rate: %0.4f \t\t Overall partially get rate: %0.4f \n",
+				intervalPartiallyGetRate,
+				overallPartiallyGetRate,
+			)
+
+			//_, err := fmt.Fprintf(os.Stderr, "After %d queries with %d workers:\nInterval query rate: %0.2f queries/sec\tOverall query rate: %0.2f queries/sec\n",
+			//	i-sp.args.burnIn,
+			//	workers,
+			//	intervalQueryRate,
+			//	overallQueryRate,
+			//)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -161,13 +210,26 @@ func (sp *defaultStatProcessor) process(workers uint) {
 				log.Fatal(err)
 			}
 			prevRequestCount = sp.opsCount
+			sp.prevByteLength = sp.totalByteLength
+			sp.prevFullyGetNum = sp.totalFullyGetNum
+			sp.prevPartialGetNum = sp.totalPartialGetNum
 			prevTime = now
 		}
 	}
 	sinceStart := time.Now().Sub(sp.startTime)
 	overallQueryRate := float64(sp.opsCount) / float64(sinceStart.Seconds())
+
+	overallFullyGetNum := sp.totalFullyGetNum
+	overallPartiallyGetNum := sp.totalPartialGetNum
+	overallFullyGetRate := float64(sp.totalFullyGetNum) / float64(i-sp.args.burnIn)
+	overallPartiallyGetRate := float64(sp.totalPartialGetNum) / float64(i-sp.args.burnIn)
+
+	_, err := fmt.Printf("Run complete after %d queries with %d workers \n\t\t(Overall query rate %0.4f queries/sec)\n"+
+		"\t\t(Overall fully get number %d )\n\t\t(Overall fully get rate %0.4f )\n\t\t(Overall partially get number %d )\n\t\t(Overall partially get rate %0.4f )\n",
+		i-sp.args.burnIn, workers, overallQueryRate, overallFullyGetNum, overallFullyGetRate, overallPartiallyGetNum, overallPartiallyGetRate)
+
 	// the final stats output goes to stdout:
-	_, err := fmt.Printf("Run complete after %d queries with %d workers (Overall query rate %0.2f queries/sec):\n", i-sp.args.burnIn, workers, overallQueryRate)
+	//_, err := fmt.Printf("Run complete after %d queries with %d workers (Overall query rate %0.2f queries/sec):\n", i-sp.args.burnIn, workers, overallQueryRate)
 	if err != nil {
 		log.Fatal(err)
 	}

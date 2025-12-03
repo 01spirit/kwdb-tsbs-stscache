@@ -25,6 +25,8 @@ const (
 	QueryTypeSingleGroupby5_1_1  = "single-groupby-5-1-1"
 	QueryTypeSingleGroupby5_1_12 = "single-groupby-5-1-12"
 	QueryTypeSingleGroupby5_8_1  = "single-groupby-5-8-1"
+
+	QueryTypeCPUQueries = "cpu-queries"
 )
 
 // 用于prepare查询时的参数缓存、数据管理和写入控制
@@ -198,6 +200,12 @@ func (p *processor) Initquery(s string) {
 		buffer.Init()
 		p.buffer = make(map[string]*fixedArgList)
 		p.buffer[s] = buffer
+	case QueryTypeCPUQueries:
+		p.InitCpuQueries()
+		buffer := newFixedArgList(12)
+		buffer.Init()
+		p.buffer = make(map[string]*fixedArgList)
+		p.buffer[s] = buffer
 	}
 }
 
@@ -312,6 +320,19 @@ func (p *processor) InitSingleGroupby_Hosts() {
 	}
 }
 
+func (p *processor) InitCpuQueries() {
+	p.prepareStmt.Grow(350)
+	p.prepareStmt.WriteString("SELECT time_bucket(k_timestamp, '3600s') as k_timestamp, avg(usage_user), " +
+		"avg(usage_system), avg(usage_idle), avg(usage_nice), avg(usage_iowait), avg(usage_irq), " +
+		"avg(usage_softirq), avg(usage_steal), avg(usage_guest), avg(usage_guest_nice) FROM cpu " +
+		"WHERE hostname IN ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) AND k_timestamp >= $11 AND k_timestamp < $12 " +
+		"GROUP BY hostname,time_bucket(k_timestamp, '3600s') ORDER BY hostname,time_bucket(k_timestamp, '3600s')")
+	p.formatBuf = make([]int16, 12)
+	for i := 0; i < 12; i++ {
+		p.formatBuf[i] = 1
+	}
+}
+
 func (p *processor) RunCpu1(querys []string, tableBuffer *fixedArgList) {
 	// hostname
 	v := strings.TrimSpace(querys[0])
@@ -328,6 +349,16 @@ func (p *processor) RunCpu8(querys []string, tableBuffer *fixedArgList) {
 	}
 	//time
 	settime(querys[8], querys[9], tableBuffer)
+}
+
+func (p *processor) RunCpuQueries(querys []string, tableBuffer *fixedArgList) {
+	// 8hostnames
+	for i := 0; i < 10; i++ {
+		v := strings.TrimSpace(querys[i])
+		tableBuffer.Append([]byte(v))
+	}
+	//time
+	settime(querys[10], querys[11], tableBuffer)
 }
 
 func (p *processor) RunDoubleGroup(querys []string, tableBuffer *fixedArgList) {
@@ -394,6 +425,8 @@ func settime(starttime string, endtime string, tableBuffer *fixedArgList) {
 func (p *processor) RunSelect(querytype string, querys []string, tableBuffer *fixedArgList) {
 	switch querytype {
 	// cpu-only
+	case QueryTypeCPUQueries:
+		p.RunCpuQueries(querys, tableBuffer)
 	case QueryTypeCPUMaxAll1:
 		p.RunCpu1(querys, tableBuffer)
 	case QueryTypeCPUMaxAll8:

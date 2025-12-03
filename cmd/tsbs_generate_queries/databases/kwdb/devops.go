@@ -2,12 +2,18 @@ package kwdb
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/timescale/tsbs/cmd/tsbs_generate_queries/databases"
 	"github.com/timescale/tsbs/cmd/tsbs_generate_queries/uses/devops"
 	"github.com/timescale/tsbs/pkg/query"
 )
+
+const goTimeFmt = "2006-01-02 15:04:05.999999 -0700"
+
+//const goTimeFmt = "2006-01-02 15:04:05-07:00"
 
 // TODO: Remove the need for this by continuing to bubble up errors
 func panicIfErr(err error) {
@@ -29,7 +35,8 @@ func (d *Devops) getHostWhereWithHostnames(hostnames []string) string {
 	for _, s := range hostnames {
 		hostnameClauses = append(hostnameClauses, fmt.Sprintf("'%s'", s))
 	}
-	return fmt.Sprintf("satisfying device.hostname in (%s)", strings.Join(hostnameClauses, ","))
+	//return fmt.Sprintf("satisfying device.hostname in (%s)", strings.Join(hostnameClauses, ","))
+	return fmt.Sprintf("hostname IN (%s)", strings.Join(hostnameClauses, ","))
 }
 
 // getHostWhereString gets multiple random hostnames and creates a WHERE SQL statement for these hostnames.
@@ -37,6 +44,23 @@ func (d *Devops) getHostWhereString(nHosts int) string {
 	hostnames, err := d.GetRandomHosts(nHosts)
 	panicIfErr(err)
 	return d.getHostWhereWithHostnames(hostnames)
+}
+
+func (d *Devops) getHostWhereStringAndTagString(metric string, nHosts int) (string, string) {
+	hostnames, err := d.GetRandomHosts(nHosts)
+	databases.PanicIfErr(err)
+	return d.getHostWhereWithHostnames(hostnames), d.getTagStringWithNames(metric, hostnames)
+}
+
+func (d *Devops) getTagStringWithNames(metric string, names []string) string {
+	tagString := ""
+	tagString += "{"
+	slices.Sort(names)
+	for _, s := range names {
+		tagString += fmt.Sprintf("(%s.hostname=%s)", metric, s)
+	}
+	tagString += "}"
+	return tagString
 }
 
 func (d *Devops) getSelectClausesAggMetrics(agg string, metrics []string) []string {
@@ -276,5 +300,23 @@ func (d *Devops) HighCPUForHosts(qi query.Query, nHosts int) {
 	humanLabel, err := devops.GetHighCPULabel("KWDB", nHosts)
 	panicIfErr(err)
 	humanDesc := fmt.Sprintf("%s: %s", humanLabel, interval.StartString())
+	d.fillInQuery(qi, humanLabel, humanDesc, devops.TableName, sql)
+}
+
+func (d *Devops) CPUQueries(qi query.Query) {
+	interval := d.Interval.MustRandWindow(devops.HighCPUDuration)
+	sql := ""
+	hostWhereString, tagString := d.getHostWhereStringAndTagString("cpu", 10)
+
+	sql = fmt.Sprintf(`SELECT time_bucket(k_timestamp, '3600s') as k_timestamp,hostname,avg(usage_user),avg(usage_system),avg(usage_idle),avg(usage_nice),avg(usage_iowait),avg(usage_irq),avg(usage_softirq),avg(usage_steal),avg(usage_guest),avg(usage_guest_nice) FROM cpu WHERE %s AND k_timestamp >= '%s' AND k_timestamp < '%s' GROUP BY hostname, time_bucket(k_timestamp, '3600s') ORDER BY hostname, time_bucket(k_timestamp, '3600s')`,
+		hostWhereString,
+		interval.Start().Format(goTimeFmt),
+		interval.End().Format(goTimeFmt))
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{usage_user[int64],usage_system[int64],usage_idle[int64],usage_nice[int64],usage_iowait[int64],usage_irq[int64],usage_softirq[int64],usage_steal[int64],usage_guest[int64],usage_guest_nice[int64]}#{empty}#{mean,%dm}", tagString, 60)
+
+	humanLabel := "KWDB CPU Queries "
+	humanDesc := humanLabel
 	d.fillInQuery(qi, humanLabel, humanDesc, devops.TableName, sql)
 }

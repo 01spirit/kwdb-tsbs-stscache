@@ -291,7 +291,7 @@ if [ ! -f "${loadDataDir}/${tsbs_case}_${format}_scale_${scale}_${load_workers}o
         --orderquantity=${load_workers} > ${loadDataDir}/${tsbs_case}_${format}_scale_${scale}_${load_workers}order.dat
     sleep 10
 else
-    echo load data already exists
+    echo "load data already exists, path = ${loadDataDir}"
 fi
 
 

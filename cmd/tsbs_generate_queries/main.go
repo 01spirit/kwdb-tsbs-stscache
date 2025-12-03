@@ -4,9 +4,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/timescale/tsbs/pkg/query/config"
 	"os"
 	"time"
+
+	"github.com/timescale/tsbs/pkg/query/config"
 
 	"github.com/blagojts/viper"
 	"github.com/spf13/pflag"
@@ -35,6 +36,8 @@ var useCaseMatrix = map[string]map[string]utils.QueryFillerMaker{
 		devops.LabelHighCPU + "-all":          devops.NewHighCPU(0),
 		devops.LabelHighCPU + "-1":            devops.NewHighCPU(1),
 		devops.LabelLastpoint:                 devops.NewLastPointPerHost,
+
+		devops.LabelCPUQueries: devops.NewCPUQueries,
 	},
 	"iot": {
 		iot.LabelLastLoc:                       iot.NewLastLocPerTruck,

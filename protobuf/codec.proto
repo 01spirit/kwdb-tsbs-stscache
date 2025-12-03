@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+option go_package = "./pkg;codec";
+
+package codec;
+
+//type SemanticSeries struct {
+//    seriesSegment string
+//    segmentLen    int64
+//    value         []byte
+//}
+//
+//type SemanticMeta struct {
+//    metaSegment string
+//    segmentLen  int64
+//    seriesNum   int64
+//    seriesArr   []SemanticSeries
+//}
+
+// SemanticSeries 消息
+message SemanticSeries {
+  string series_segment = 1; // 系列段
+  int64 segment_len = 2;     // 段长度
+  bytes value = 3;           // 值（字节数组）
+}
+
+// SemanticMeta 消息
+message SemanticMeta {
+  string meta_segment = 1;      // 元数据段
+  int64 segment_len = 2;        // 段长度
+  int64 series_num = 3;         // 系列数量
+  repeated SemanticSeries series_arr = 4; // 系列数组
+}
