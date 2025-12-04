@@ -2,9 +2,11 @@ package kwdb
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/timescale/tsbs/cmd/tsbs_generate_queries/uses/devops"
 	"github.com/timescale/tsbs/cmd/tsbs_generate_queries/uses/iot"
 	"github.com/timescale/tsbs/pkg/query"
 )
@@ -36,6 +38,25 @@ func (i *IoT) getTruckWhereString(nTrucks int) string {
 	names, err := i.GetRandomTrucks(nTrucks)
 	panicIfErr(err)
 	return i.getTrucksWhereWithNames(names)
+}
+
+func (i *IoT) getTruckWhereStringAndTagString(metric string, nTrucks int) (string, string) {
+	names, err := i.GetRandomTrucks(nTrucks)
+	if err != nil {
+		panic(err.Error())
+	}
+	return i.getTrucksWhereWithNames(names), i.getTagStringWithNames(metric, names)
+}
+
+func (i *IoT) getTagStringWithNames(metric string, names []string) string {
+	tagString := ""
+	tagString += "{"
+	slices.Sort(names)
+	for _, s := range names {
+		tagString += fmt.Sprintf("(%s.name=%s)", metric, s)
+	}
+	tagString += "}"
+	return tagString
 }
 
 // LastLocByTruck finds the truck location for nTrucks.
@@ -288,4 +309,22 @@ func tenMinutePeriods(minutesPerHour float64, duration time.Duration) int {
 func parseTime(time time.Time) string {
 	timeStr := strings.Split(time.String(), " ")
 	return fmt.Sprintf("%s %s", timeStr[0], timeStr[1])
+}
+
+func (i *IoT) IotQueries(qi query.Query) {
+	interval := i.Interval.MustRandWindow(iot.DailyDrivingDuration)
+	sql := ""
+	truckWhereString, tagString := i.getTruckWhereStringAndTagString("readings", 10)
+
+	sql = fmt.Sprintf(`SELECT time_bucket(k_timestamp, '3600s') as k_timestamp,name,avg(velocity),avg(fuel_consumption),avg(grade) FROM readings WHERE %s AND k_timestamp >= '%s' AND k_timestamp < '%s' GROUP BY name, time_bucket(k_timestamp, '3600s') ORDER BY name, time_bucket(k_timestamp, '3600s')`,
+		truckWhereString,
+		interval.Start().Format(goTimeFmt),
+		interval.End().Format(goTimeFmt))
+
+	sql += ";"
+	sql += fmt.Sprintf("%s#{velocity[float64],fuel_consumption[float64],grade[float64]}#{empty}#{mean,%dm}", tagString, 60)
+
+	humanLabel := "KWDB IoT Queries "
+	humanDesc := humanLabel
+	i.fillInQuery(qi, humanLabel, humanDesc, devops.TableName, sql)
 }

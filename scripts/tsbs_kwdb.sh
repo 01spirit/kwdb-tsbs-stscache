@@ -26,7 +26,7 @@ parallel_degree=${parallel_degree:-8}  # 查询并行性，默认为 8
 
 ## 数据写入配置
 insert_type=${insert_type:-insert}  # 写入方式，默认为 insert,可设置：insert、prepare、prepareiot
-tsbs_case=${tsbs_case:-cpu-only}    # case 类型，默认为 cpu-only, 可设置：iot
+tsbs_case=${tsbs_case:-iot}    # case 类型，默认为 cpu-only, 可设置：iot
 
     注：case 与 insert-type 的对应关系如下：
     | case     | insert-type |
@@ -63,7 +63,7 @@ printf "%-20s %-20s %-20s %-20s\n" \
 printf "\n"
 
 
-data_dir=${workspace}/tsbs_test
+data_dir=${workspace}/tsbs_test_iot
 cd ${workspace}/bin
 export KW_WAL_LEVEL=${wal}
 
@@ -192,7 +192,7 @@ mkdir -p ${queryDataDir}
 mkdir -p ${queryResultDir}
 
 # 数据库名称
-db_name="benchmark"
+db_name="benchmark-iot"
 
 # 负载测试参数
 load_ts_start="2016-01-01T00:00:00Z"
